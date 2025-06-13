@@ -1,0 +1,2040 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: public/**
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+media-optimizer-ui/
+  .git/
+    hooks/
+      applypatch-msg.sample
+      commit-msg.sample
+      fsmonitor-watchman.sample
+      post-update.sample
+      pre-applypatch.sample
+      pre-commit.sample
+      pre-merge-commit.sample
+      pre-push.sample
+      pre-rebase.sample
+      pre-receive.sample
+      prepare-commit-msg.sample
+      push-to-checkout.sample
+      update.sample
+    info/
+      exclude
+    logs/
+      refs/
+        heads/
+          main
+      HEAD
+    refs/
+      heads/
+        main
+    COMMIT_EDITMSG
+    config
+    description
+    HEAD
+  public/
+    index.html
+    manifest.json
+    robots.txt
+  src/
+    App.css
+    App.js
+    App.test.js
+    index.css
+    index.js
+    logo.svg
+    reportWebVitals.js
+    setupTests.js
+  .gitignore
+  package.json
+  README.md
+optimizer-backend/
+  app.py
+  optimizer.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="media-optimizer-ui/.git/hooks/applypatch-msg.sample">
+#!/bin/sh
+#
+# An example hook script to check the commit log message taken by
+# applypatch from an e-mail message.
+#
+# The hook should exit with non-zero status after issuing an
+# appropriate message if it wants to stop the commit.  The hook is
+# allowed to edit the commit message file.
+#
+# To enable this hook, rename this file to "applypatch-msg".
+
+. git-sh-setup
+commitmsg="$(git rev-parse --git-path hooks/commit-msg)"
+test -x "$commitmsg" && exec "$commitmsg" ${1+"$@"}
+:
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/commit-msg.sample">
+#!/bin/sh
+#
+# An example hook script to check the commit log message.
+# Called by "git commit" with one argument, the name of the file
+# that has the commit message.  The hook should exit with non-zero
+# status after issuing an appropriate message if it wants to stop the
+# commit.  The hook is allowed to edit the commit message file.
+#
+# To enable this hook, rename this file to "commit-msg".
+
+# Uncomment the below to add a Signed-off-by line to the message.
+# Doing this in a hook is a bad idea in general, but the prepare-commit-msg
+# hook is more suited to it.
+#
+# SOB=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+# grep -qs "^$SOB" "$1" || echo "$SOB" >> "$1"
+
+# This example catches duplicate Signed-off-by lines.
+
+test "" = "$(grep '^Signed-off-by: ' "$1" |
+	 sort | uniq -c | sed -e '/^[ 	]*1[ 	]/d')" || {
+	echo >&2 Duplicate Signed-off-by lines.
+	exit 1
+}
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/fsmonitor-watchman.sample">
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use IPC::Open2;
+
+# An example hook script to integrate Watchman
+# (https://facebook.github.io/watchman/) with git to speed up detecting
+# new and modified files.
+#
+# The hook is passed a version (currently 2) and last update token
+# formatted as a string and outputs to stdout a new update token and
+# all files that have been modified since the update token. Paths must
+# be relative to the root of the working tree and separated by a single NUL.
+#
+# To enable this hook, rename this file to "query-watchman" and set
+# 'git config core.fsmonitor .git/hooks/query-watchman'
+#
+my ($version, $last_update_token) = @ARGV;
+
+# Uncomment for debugging
+# print STDERR "$0 $version $last_update_token\n";
+
+# Check the hook interface version
+if ($version ne 2) {
+	die "Unsupported query-fsmonitor hook version '$version'.\n" .
+	    "Falling back to scanning...\n";
+}
+
+my $git_work_tree = get_working_dir();
+
+my $retry = 1;
+
+my $json_pkg;
+eval {
+	require JSON::XS;
+	$json_pkg = "JSON::XS";
+	1;
+} or do {
+	require JSON::PP;
+	$json_pkg = "JSON::PP";
+};
+
+launch_watchman();
+
+sub launch_watchman {
+	my $o = watchman_query();
+	if (is_work_tree_watched($o)) {
+		output_result($o->{clock}, @{$o->{files}});
+	}
+}
+
+sub output_result {
+	my ($clockid, @files) = @_;
+
+	# Uncomment for debugging watchman output
+	# open (my $fh, ">", ".git/watchman-output.out");
+	# binmode $fh, ":utf8";
+	# print $fh "$clockid\n@files\n";
+	# close $fh;
+
+	binmode STDOUT, ":utf8";
+	print $clockid;
+	print "\0";
+	local $, = "\0";
+	print @files;
+}
+
+sub watchman_clock {
+	my $response = qx/watchman clock "$git_work_tree"/;
+	die "Failed to get clock id on '$git_work_tree'.\n" .
+		"Falling back to scanning...\n" if $? != 0;
+
+	return $json_pkg->new->utf8->decode($response);
+}
+
+sub watchman_query {
+	my $pid = open2(\*CHLD_OUT, \*CHLD_IN, 'watchman -j --no-pretty')
+	or die "open2() failed: $!\n" .
+	"Falling back to scanning...\n";
+
+	# In the query expression below we're asking for names of files that
+	# changed since $last_update_token but not from the .git folder.
+	#
+	# To accomplish this, we're using the "since" generator to use the
+	# recency index to select candidate nodes and "fields" to limit the
+	# output to file names only. Then we're using the "expression" term to
+	# further constrain the results.
+	my $last_update_line = "";
+	if (substr($last_update_token, 0, 1) eq "c") {
+		$last_update_token = "\"$last_update_token\"";
+		$last_update_line = qq[\n"since": $last_update_token,];
+	}
+	my $query = <<"	END";
+		["query", "$git_work_tree", {$last_update_line
+			"fields": ["name"],
+			"expression": ["not", ["dirname", ".git"]]
+		}]
+	END
+
+	# Uncomment for debugging the watchman query
+	# open (my $fh, ">", ".git/watchman-query.json");
+	# print $fh $query;
+	# close $fh;
+
+	print CHLD_IN $query;
+	close CHLD_IN;
+	my $response = do {local $/; <CHLD_OUT>};
+
+	# Uncomment for debugging the watch response
+	# open ($fh, ">", ".git/watchman-response.json");
+	# print $fh $response;
+	# close $fh;
+
+	die "Watchman: command returned no output.\n" .
+	"Falling back to scanning...\n" if $response eq "";
+	die "Watchman: command returned invalid output: $response\n" .
+	"Falling back to scanning...\n" unless $response =~ /^\{/;
+
+	return $json_pkg->new->utf8->decode($response);
+}
+
+sub is_work_tree_watched {
+	my ($output) = @_;
+	my $error = $output->{error};
+	if ($retry > 0 and $error and $error =~ m/unable to resolve root .* directory (.*) is not watched/) {
+		$retry--;
+		my $response = qx/watchman watch "$git_work_tree"/;
+		die "Failed to make watchman watch '$git_work_tree'.\n" .
+		    "Falling back to scanning...\n" if $? != 0;
+		$output = $json_pkg->new->utf8->decode($response);
+		$error = $output->{error};
+		die "Watchman: $error.\n" .
+		"Falling back to scanning...\n" if $error;
+
+		# Uncomment for debugging watchman output
+		# open (my $fh, ">", ".git/watchman-output.out");
+		# close $fh;
+
+		# Watchman will always return all files on the first query so
+		# return the fast "everything is dirty" flag to git and do the
+		# Watchman query just to get it over with now so we won't pay
+		# the cost in git to look up each individual file.
+		my $o = watchman_clock();
+		$error = $output->{error};
+
+		die "Watchman: $error.\n" .
+		"Falling back to scanning...\n" if $error;
+
+		output_result($o->{clock}, ("/"));
+		$last_update_token = $o->{clock};
+
+		eval { launch_watchman() };
+		return 0;
+	}
+
+	die "Watchman: $error.\n" .
+	"Falling back to scanning...\n" if $error;
+
+	return 1;
+}
+
+sub get_working_dir {
+	my $working_dir;
+	if ($^O =~ 'msys' || $^O =~ 'cygwin') {
+		$working_dir = Win32::GetCwd();
+		$working_dir =~ tr/\\/\//;
+	} else {
+		require Cwd;
+		$working_dir = Cwd::cwd();
+	}
+
+	return $working_dir;
+}
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/post-update.sample">
+#!/bin/sh
+#
+# An example hook script to prepare a packed repository for use over
+# dumb transports.
+#
+# To enable this hook, rename this file to "post-update".
+
+exec git update-server-info
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-applypatch.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed
+# by applypatch from an e-mail message.
+#
+# The hook should exit with non-zero status after issuing an
+# appropriate message if it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-applypatch".
+
+. git-sh-setup
+precommit="$(git rev-parse --git-path hooks/pre-commit)"
+test -x "$precommit" && exec "$precommit" ${1+"$@"}
+:
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-commit.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git commit" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message if
+# it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-commit".
+
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+	# Initial commit: diff against an empty tree object
+	against=$(git hash-object -t tree /dev/null)
+fi
+
+# If you want to allow non-ASCII filenames set this variable to true.
+allownonascii=$(git config --type=bool hooks.allownonascii)
+
+# Redirect output to stderr.
+exec 1>&2
+
+# Cross platform projects tend to avoid non-ASCII filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+	# Note that the use of brackets around a tr range is ok here, (it's
+	# even required, for portability to Solaris 10's /usr/bin/tr), since
+	# the square bracket bytes happen to fall in the designated range.
+	test $(git diff --cached --name-only --diff-filter=A -z $against |
+	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+	cat <<\EOF
+Error: Attempt to add a non-ASCII file name.
+
+This can cause problems if you want to work with people on other platforms.
+
+To be portable it is advisable to rename the file.
+
+If you know what you are doing you can disable this check using:
+
+  git config hooks.allownonascii true
+EOF
+	exit 1
+fi
+
+# If there are whitespace errors, print the offending file names and fail.
+exec git diff-index --check --cached $against --
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-merge-commit.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git merge" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message to
+# stderr if it wants to stop the merge commit.
+#
+# To enable this hook, rename this file to "pre-merge-commit".
+
+. git-sh-setup
+test -x "$GIT_DIR/hooks/pre-commit" &&
+        exec "$GIT_DIR/hooks/pre-commit"
+:
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-push.sample">
+#!/bin/sh
+
+# An example hook script to verify what is about to be pushed.  Called by "git
+# push" after it has checked the remote status, but before anything has been
+# pushed.  If this script exits with a non-zero status nothing will be pushed.
+#
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+#
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local oid> <remote ref> <remote oid>
+#
+# This sample shows how to prevent push of commits where the log message starts
+# with "WIP" (work in progress).
+
+remote="$1"
+url="$2"
+
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+
+while read local_ref local_oid remote_ref remote_oid
+do
+	if test "$local_oid" = "$zero"
+	then
+		# Handle delete
+		:
+	else
+		if test "$remote_oid" = "$zero"
+		then
+			# New branch, examine all commits
+			range="$local_oid"
+		else
+			# Update to existing branch, examine new commits
+			range="$remote_oid..$local_oid"
+		fi
+
+		# Check for WIP commit
+		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
+		if test -n "$commit"
+		then
+			echo >&2 "Found WIP commit in $local_ref, not pushing"
+			exit 1
+		fi
+	fi
+done
+
+exit 0
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-rebase.sample">
+#!/bin/sh
+#
+# Copyright (c) 2006, 2008 Junio C Hamano
+#
+# The "pre-rebase" hook is run just before "git rebase" starts doing
+# its job, and can prevent the command from running by exiting with
+# non-zero status.
+#
+# The hook is called with the following parameters:
+#
+# $1 -- the upstream the series was forked from.
+# $2 -- the branch being rebased (or empty when rebasing the current branch).
+#
+# This sample shows how to prevent topic branches that are already
+# merged to 'next' branch from getting rebased, because allowing it
+# would result in rebasing already published history.
+
+publish=next
+basebranch="$1"
+if test "$#" = 2
+then
+	topic="refs/heads/$2"
+else
+	topic=`git symbolic-ref HEAD` ||
+	exit 0 ;# we do not interrupt rebasing detached HEAD
+fi
+
+case "$topic" in
+refs/heads/??/*)
+	;;
+*)
+	exit 0 ;# we do not interrupt others.
+	;;
+esac
+
+# Now we are dealing with a topic branch being rebased
+# on top of master.  Is it OK to rebase it?
+
+# Does the topic really exist?
+git show-ref -q "$topic" || {
+	echo >&2 "No such branch $topic"
+	exit 1
+}
+
+# Is topic fully merged to master?
+not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
+if test -z "$not_in_master"
+then
+	echo >&2 "$topic is fully merged to master; better remove it."
+	exit 1 ;# we could allow it, but there is no point.
+fi
+
+# Is topic ever merged to next?  If so you should not be rebasing it.
+only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
+only_next_2=`git rev-list ^master           ${publish} | sort`
+if test "$only_next_1" = "$only_next_2"
+then
+	not_in_topic=`git rev-list "^$topic" master`
+	if test -z "$not_in_topic"
+	then
+		echo >&2 "$topic is already up to date with master"
+		exit 1 ;# we could allow it, but there is no point.
+	else
+		exit 0
+	fi
+else
+	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
+	/usr/bin/perl -e '
+		my $topic = $ARGV[0];
+		my $msg = "* $topic has commits already merged to public branch:\n";
+		my (%not_in_next) = map {
+			/^([0-9a-f]+) /;
+			($1 => 1);
+		} split(/\n/, $ARGV[1]);
+		for my $elem (map {
+				/^([0-9a-f]+) (.*)$/;
+				[$1 => $2];
+			} split(/\n/, $ARGV[2])) {
+			if (!exists $not_in_next{$elem->[0]}) {
+				if ($msg) {
+					print STDERR $msg;
+					undef $msg;
+				}
+				print STDERR " $elem->[1]\n";
+			}
+		}
+	' "$topic" "$not_in_next" "$not_in_master"
+	exit 1
+fi
+
+<<\DOC_END
+
+This sample hook safeguards topic branches that have been
+published from being rewound.
+
+The workflow assumed here is:
+
+ * Once a topic branch forks from "master", "master" is never
+   merged into it again (either directly or indirectly).
+
+ * Once a topic branch is fully cooked and merged into "master",
+   it is deleted.  If you need to build on top of it to correct
+   earlier mistakes, a new topic branch is created by forking at
+   the tip of the "master".  This is not strictly necessary, but
+   it makes it easier to keep your history simple.
+
+ * Whenever you need to test or publish your changes to topic
+   branches, merge them into "next" branch.
+
+The script, being an example, hardcodes the publish branch name
+to be "next", but it is trivial to make it configurable via
+$GIT_DIR/config mechanism.
+
+With this workflow, you would want to know:
+
+(1) ... if a topic branch has ever been merged to "next".  Young
+    topic branches can have stupid mistakes you would rather
+    clean up before publishing, and things that have not been
+    merged into other branches can be easily rebased without
+    affecting other people.  But once it is published, you would
+    not want to rewind it.
+
+(2) ... if a topic branch has been fully merged to "master".
+    Then you can delete it.  More importantly, you should not
+    build on top of it -- other people may already want to
+    change things related to the topic as patches against your
+    "master", so if you need further changes, it is better to
+    fork the topic (perhaps with the same name) afresh from the
+    tip of "master".
+
+Let's look at this example:
+
+		   o---o---o---o---o---o---o---o---o---o "next"
+		  /       /           /           /
+		 /   a---a---b A     /           /
+		/   /               /           /
+	       /   /   c---c---c---c B         /
+	      /   /   /             \         /
+	     /   /   /   b---b C     \       /
+	    /   /   /   /             \     /
+    ---o---o---o---o---o---o---o---o---o---o---o "master"
+
+
+A, B and C are topic branches.
+
+ * A has one fix since it was merged up to "next".
+
+ * B has finished.  It has been fully merged up to "master" and "next",
+   and is ready to be deleted.
+
+ * C has not merged to "next" at all.
+
+We would want to allow C to be rebased, refuse A, and encourage
+B to be deleted.
+
+To compute (1):
+
+	git rev-list ^master ^topic next
+	git rev-list ^master        next
+
+	if these match, topic has not merged in next at all.
+
+To compute (2):
+
+	git rev-list master..topic
+
+	if this is empty, it is fully merged to "master".
+
+DOC_END
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/pre-receive.sample">
+#!/bin/sh
+#
+# An example hook script to make use of push options.
+# The example simply echoes all push options that start with 'echoback='
+# and rejects all pushes when the "reject" push option is used.
+#
+# To enable this hook, rename this file to "pre-receive".
+
+if test -n "$GIT_PUSH_OPTION_COUNT"
+then
+	i=0
+	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
+	do
+		eval "value=\$GIT_PUSH_OPTION_$i"
+		case "$value" in
+		echoback=*)
+			echo "echo from the pre-receive-hook: ${value#*=}" >&2
+			;;
+		reject)
+			exit 1
+		esac
+		i=$((i + 1))
+	done
+fi
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/prepare-commit-msg.sample">
+#!/bin/sh
+#
+# An example hook script to prepare the commit log message.
+# Called by "git commit" with the name of the file that has the
+# commit message, followed by the description of the commit
+# message's source.  The hook's purpose is to edit the commit
+# message file.  If the hook fails with a non-zero status,
+# the commit is aborted.
+#
+# To enable this hook, rename this file to "prepare-commit-msg".
+
+# This hook includes three examples. The first one removes the
+# "# Please enter the commit message..." help message.
+#
+# The second includes the output of "git diff --name-status -r"
+# into the message, just before the "git status" output.  It is
+# commented because it doesn't cope with --amend or with squashed
+# commits.
+#
+# The third example adds a Signed-off-by line to the message, that can
+# still be edited.  This is rarely a good idea.
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+SHA1=$3
+
+/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
+
+# case "$COMMIT_SOURCE,$SHA1" in
+#  ,|template,)
+#    /usr/bin/perl -i.bak -pe '
+#       print "\n" . `git diff --cached --name-status -r`
+# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
+#  *) ;;
+# esac
+
+# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
+# if test -z "$COMMIT_SOURCE"
+# then
+#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
+# fi
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/push-to-checkout.sample">
+#!/bin/sh
+
+# An example hook script to update a checked-out tree on a git push.
+#
+# This hook is invoked by git-receive-pack(1) when it reacts to git
+# push and updates reference(s) in its repository, and when the push
+# tries to update the branch that is currently checked out and the
+# receive.denyCurrentBranch configuration variable is set to
+# updateInstead.
+#
+# By default, such a push is refused if the working tree and the index
+# of the remote repository has any difference from the currently
+# checked out commit; when both the working tree and the index match
+# the current commit, they are updated to match the newly pushed tip
+# of the branch. This hook is to be used to override the default
+# behaviour; however the code below reimplements the default behaviour
+# as a starting point for convenient modification.
+#
+# The hook receives the commit with which the tip of the current
+# branch is going to be updated:
+commit=$1
+
+# It can exit with a non-zero status to refuse the push (when it does
+# so, it must not modify the index or the working tree).
+die () {
+	echo >&2 "$*"
+	exit 1
+}
+
+# Or it can make any necessary changes to the working tree and to the
+# index to bring them to the desired state when the tip of the current
+# branch is updated to the new commit, and exit with a zero status.
+#
+# For example, the hook can simply run git read-tree -u -m HEAD "$1"
+# in order to emulate git fetch that is run in the reverse direction
+# with git push, as the two-tree form of git read-tree -u -m is
+# essentially the same as git switch or git checkout that switches
+# branches while keeping the local changes in the working tree that do
+# not interfere with the difference between the branches.
+
+# The below is a more-or-less exact translation to shell of the C code
+# for the default behaviour for git's push-to-checkout hook defined in
+# the push_to_deploy() function in builtin/receive-pack.c.
+#
+# Note that the hook will be executed from the repository directory,
+# not from the working tree, so if you want to perform operations on
+# the working tree, you will have to adapt your code accordingly, e.g.
+# by adding "cd .." or using relative paths.
+
+if ! git update-index -q --ignore-submodules --refresh
+then
+	die "Up-to-date check failed"
+fi
+
+if ! git diff-files --quiet --ignore-submodules --
+then
+	die "Working directory has unstaged changes"
+fi
+
+# This is a rough translation of:
+#
+#   head_has_history() ? "HEAD" : EMPTY_TREE_SHA1_HEX
+if git cat-file -e HEAD 2>/dev/null
+then
+	head=HEAD
+else
+	head=$(git hash-object -t tree --stdin </dev/null)
+fi
+
+if ! git diff-index --quiet --cached --ignore-submodules $head --
+then
+	die "Working directory has staged changes"
+fi
+
+if ! git read-tree -u -m "$commit"
+then
+	die "Could not update working tree to new HEAD"
+fi
+</file>
+
+<file path="media-optimizer-ui/.git/hooks/update.sample">
+#!/bin/sh
+#
+# An example hook script to block unannotated tags from entering.
+# Called by "git receive-pack" with arguments: refname sha1-old sha1-new
+#
+# To enable this hook, rename this file to "update".
+#
+# Config
+# ------
+# hooks.allowunannotated
+#   This boolean sets whether unannotated tags will be allowed into the
+#   repository.  By default they won't be.
+# hooks.allowdeletetag
+#   This boolean sets whether deleting tags will be allowed in the
+#   repository.  By default they won't be.
+# hooks.allowmodifytag
+#   This boolean sets whether a tag may be modified after creation. By default
+#   it won't be.
+# hooks.allowdeletebranch
+#   This boolean sets whether deleting branches will be allowed in the
+#   repository.  By default they won't be.
+# hooks.denycreatebranch
+#   This boolean sets whether remotely creating branches will be denied
+#   in the repository.  By default this is allowed.
+#
+
+# --- Command line
+refname="$1"
+oldrev="$2"
+newrev="$3"
+
+# --- Safety check
+if [ -z "$GIT_DIR" ]; then
+	echo "Don't run this script from the command line." >&2
+	echo " (if you want, you could supply GIT_DIR then run" >&2
+	echo "  $0 <ref> <oldrev> <newrev>)" >&2
+	exit 1
+fi
+
+if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
+	echo "usage: $0 <ref> <oldrev> <newrev>" >&2
+	exit 1
+fi
+
+# --- Config
+allowunannotated=$(git config --type=bool hooks.allowunannotated)
+allowdeletebranch=$(git config --type=bool hooks.allowdeletebranch)
+denycreatebranch=$(git config --type=bool hooks.denycreatebranch)
+allowdeletetag=$(git config --type=bool hooks.allowdeletetag)
+allowmodifytag=$(git config --type=bool hooks.allowmodifytag)
+
+# check for no description
+projectdesc=$(sed -e '1q' "$GIT_DIR/description")
+case "$projectdesc" in
+"Unnamed repository"* | "")
+	echo "*** Project description file hasn't been set" >&2
+	exit 1
+	;;
+esac
+
+# --- Check types
+# if $newrev is 0000...0000, it's a commit to delete a ref.
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+if [ "$newrev" = "$zero" ]; then
+	newrev_type=delete
+else
+	newrev_type=$(git cat-file -t $newrev)
+fi
+
+case "$refname","$newrev_type" in
+	refs/tags/*,commit)
+		# un-annotated tag
+		short_refname=${refname##refs/tags/}
+		if [ "$allowunannotated" != "true" ]; then
+			echo "*** The un-annotated tag, $short_refname, is not allowed in this repository" >&2
+			echo "*** Use 'git tag [ -a | -s ]' for tags you want to propagate." >&2
+			exit 1
+		fi
+		;;
+	refs/tags/*,delete)
+		# delete tag
+		if [ "$allowdeletetag" != "true" ]; then
+			echo "*** Deleting a tag is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/tags/*,tag)
+		# annotated tag
+		if [ "$allowmodifytag" != "true" ] && git rev-parse $refname > /dev/null 2>&1
+		then
+			echo "*** Tag '$refname' already exists." >&2
+			echo "*** Modifying a tag is not allowed in this repository." >&2
+			exit 1
+		fi
+		;;
+	refs/heads/*,commit)
+		# branch
+		if [ "$oldrev" = "$zero" -a "$denycreatebranch" = "true" ]; then
+			echo "*** Creating a branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/heads/*,delete)
+		# delete branch
+		if [ "$allowdeletebranch" != "true" ]; then
+			echo "*** Deleting a branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/remotes/*,commit)
+		# tracking branch
+		;;
+	refs/remotes/*,delete)
+		# delete tracking branch
+		if [ "$allowdeletebranch" != "true" ]; then
+			echo "*** Deleting a tracking branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	*)
+		# Anything else (is there anything else?)
+		echo "*** Update hook: unknown type of update to ref $refname of type $newrev_type" >&2
+		exit 1
+		;;
+esac
+
+# --- Finished
+exit 0
+</file>
+
+<file path="media-optimizer-ui/.git/info/exclude">
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+</file>
+
+<file path="media-optimizer-ui/.git/logs/refs/heads/main">
+0000000000000000000000000000000000000000 244d04905410ed2c07985826868cae1e1a150c77 Caleb Briggs <1calebbriggs@gmail.com> 1749766323 -0600	commit (initial): Initialize project using Create React App
+</file>
+
+<file path="media-optimizer-ui/.git/logs/HEAD">
+0000000000000000000000000000000000000000 244d04905410ed2c07985826868cae1e1a150c77 Caleb Briggs <1calebbriggs@gmail.com> 1749766323 -0600	commit (initial): Initialize project using Create React App
+</file>
+
+<file path="media-optimizer-ui/.git/refs/heads/main">
+244d04905410ed2c07985826868cae1e1a150c77
+</file>
+
+<file path="media-optimizer-ui/.git/COMMIT_EDITMSG">
+Initialize project using Create React App
+</file>
+
+<file path="media-optimizer-ui/.git/config">
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+</file>
+
+<file path="media-optimizer-ui/.git/description">
+Unnamed repository; edit this file 'description' to name the repository.
+</file>
+
+<file path="media-optimizer-ui/.git/HEAD">
+ref: refs/heads/main
+</file>
+
+<file path="media-optimizer-ui/public/index.html">
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <title>React App</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>
+</file>
+
+<file path="media-optimizer-ui/public/manifest.json">
+{
+  "short_name": "React App",
+  "name": "Create React App Sample",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
+</file>
+
+<file path="media-optimizer-ui/public/robots.txt">
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+</file>
+
+<file path="media-optimizer-ui/src/App.css">
+/* src/App.css */
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    margin: 0;
+    padding: 2rem;
+}
+
+.App {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+h1,
+h2 {
+    color: #0b2d48;
+    border-bottom: 2px solid #74a4bc;
+    padding-bottom: 0.5rem;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background-color: #eaf4f4;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.control-item label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #0b2d48;
+}
+
+.control-item input[type="number"],
+.control-item input[type="file"] {
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.optimize-button {
+    grid-column: 1 / -1;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+    background-color: #1d6a96;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.optimize-button:hover {
+    background-color: #165375;
+}
+
+.optimize-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.summary-card,
+.plan-card,
+.chart-card {
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.chart-card {
+    grid-column: 1 / -1; /* Make chart span both columns */
+}
+
+.summary-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.metric {
+    background: white;
+    padding: 1rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #666;
+    display: block;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1d6a96;
+}
+
+.plan-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.plan-table th,
+.plan-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.plan-table th {
+    background-color: #eaf4f4;
+}
+
+.error-message {
+    color: #d9534f;
+    background: #f2dede;
+    padding: 1rem;
+    border: 1px solid #ebccd1;
+    border-radius: 4px;
+    margin-top: 1rem;
+}
+
+.loading-message {
+    text-align: center;
+    font-size: 1.2rem;
+    padding: 2rem;
+    color: #666;
+}
+</file>
+
+<file path="media-optimizer-ui/src/App.js">
+// src/App.js
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import "./App.css";
+
+// Register Chart.js components we'll be using
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+);
+
+function App() {
+  // Input state
+  const [file, setFile] = useState(null);
+  const [totalAudience, setTotalAudience] = useState(1000000);
+  const [budget, setBudget] = useState(50000);
+
+  // State for the new asynchronous flow
+  const [jobId, setJobId] = useState(null);
+  const [jobStatus, setJobStatus] = useState("");
+  const [jobProgress, setJobProgress] = useState(0);
+
+  // State for results
+  const [results, setResults] = useState(null);
+  const [reachCurve, setReachCurve] = useState([]);
+
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Use a ref to store the interval ID so we can clear it correctly
+  const intervalRef = useRef(null);
+
+  // This effect hook will run to poll for job status whenever a job ID is set
+  useEffect(() => {
+    if (jobId) {
+      intervalRef.current = setInterval(pollJobStatus, 2000); // Poll every 2 seconds
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [jobId]);
+
+  const pollJobStatus = async () => {
+    if (!jobId) return;
+
+    try {
+      const response = await axios.get(
+        `http://localhost:5001/job-status/${jobId}`,
+      );
+      const data = response.data;
+
+      setJobStatus(data.status);
+      setJobProgress(data.progress);
+
+      if (data.main_result) setResults(data.main_result);
+      if (data.reach_curve) setReachCurve(data.reach_curve);
+
+      if (data.status === "Completed" || data.status === "Error") {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        setJobId(null);
+        setIsLoading(false);
+        if (data.status === "Error") {
+          setError(
+            data.error || "An unknown error occurred during optimization.",
+          );
+        }
+      }
+    } catch (err) {
+      setError(
+        "Failed to get job status. The connection to the server may have been lost.",
+      );
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const handleOptimize = async () => {
+    if (!file || !totalAudience || !budget) {
+      setError("Please fill in all fields and select a file.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setResults(null);
+    setReachCurve([]);
+    setJobId(null);
+    setJobStatus("Submitting job...");
+    setJobProgress(0);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("totalAudience", totalAudience);
+    formData.append("budget", budget);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:5001/start-optimization",
+        formData,
+      );
+      setJobId(response.data.job_id);
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Failed to start the optimization job.",
+      );
+      setIsLoading(false);
+    }
+  };
+
+  const formatNumber = (num, decimals = 0) => {
+    if (typeof num !== "number" || isNaN(num)) return num;
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  const chartData = {
+    labels: reachCurve.map((p) => formatNumber(p.budget)),
+    datasets: [
+      {
+        label: "Reach %",
+        data: reachCurve.map((p) => p.reach),
+        borderColor: "#1d6a96",
+        backgroundColor: "rgba(29, 106, 150, 0.2)",
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  };
+
+  // *** THE ONLY CHANGE IS HERE ***
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      title: { display: true, text: "Reach Curve (Efficient Frontier)" },
+    },
+    scales: {
+      x: {
+        title: { display: true, text: "Budget ($)" },
+      },
+      y: {
+        title: { display: true, text: "Net Reach (%)" },
+        // Ensure the y-axis starts at 0
+        min: 0,
+        // Let Chart.js determine the max but suggest adding some space at the top.
+        // This is the key to dynamic scaling.
+        grace: "10%", // This adds 10% of the data range as padding to the top of the axis.
+      },
+    },
+  };
+
+  return (
+    <div className="App">
+      <h1>Media Plan Optimizer</h1>
+      <p>
+        Upload your station data, set your audience size and budget, and get an
+        optimized media plan that maximizes deduplicated reach.
+      </p>
+
+      <div className="controls">
+        <div className="control-item">
+          <label htmlFor="totalAudience">Total Audience Size</label>
+          <input
+            id="totalAudience"
+            type="number"
+            value={totalAudience}
+            onChange={(e) => setTotalAudience(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        <div className="control-item">
+          <label htmlFor="budget">Total Budget ($)</label>
+          <input
+            id="budget"
+            type="number"
+            value={budget}
+            onChange={(e) => setBudget(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        <div className="control-item">
+          <label htmlFor="file">Station Data (XLSX)</label>
+          <input
+            id="file"
+            type="file"
+            accept=".xlsx"
+            onChange={(e) => setFile(e.target.files[0])}
+            disabled={isLoading}
+          />
+        </div>
+        <button
+          className="optimize-button"
+          onClick={handleOptimize}
+          disabled={isLoading}
+        >
+          {isLoading ? "Optimizing..." : "Optimize Plan"}
+        </button>
+      </div>
+
+      {error && <p className="error-message">{error}</p>}
+
+      {isLoading && (
+        <div className="loading-message">
+          <p>{jobStatus}</p>
+          {jobStatus.includes("curve") && (
+            <progress
+              value={jobProgress}
+              max="1"
+              style={{ width: "100%", marginTop: "0.5rem" }}
+            ></progress>
+          )}
+        </div>
+      )}
+
+      <div className="results-container">
+        {results && (
+          <div className="results-grid">
+            <div className="summary-card">
+              <h3>Executive Summary</h3>
+              <div className="summary-metrics">
+                <div className="metric">
+                  <span className="metric-label">Final Cost</span>
+                  <span className="metric-value">
+                    ${formatNumber(results.total_cost)}
+                  </span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Net Reach</span>
+                  <span className="metric-value">
+                    {formatNumber(results.net_reach_percentage, 2)}%
+                  </span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Reached Audience</span>
+                  <span className="metric-value">
+                    {formatNumber(results.net_reach_people)}
+                  </span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Avg. Frequency</span>
+                  <span className="metric-value">
+                    {formatNumber(results.avg_frequency, 2)}
+                  </span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">GRPs</span>
+                  <span className="metric-value">
+                    {formatNumber(results.grps)}
+                  </span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Spots</span>
+                  <span className="metric-value">{results.plan.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="plan-card">
+              <h3>Optimized Media Plan</h3>
+              <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                <table className="plan-table">
+                  <thead>
+                    <tr>
+                      <th>Station</th>
+                      <th>Cost</th>
+                      <th>Cume</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.plan
+                      .sort((a, b) => b.Cost - a.Cost)
+                      .map((station, index) => (
+                        <tr key={index}>
+                          <td>{station.Station}</td>
+                          <td>${formatNumber(station.Cost)}</td>
+                          <td>{formatNumber(station.Cume)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reachCurve.length > 1 && (
+          <div className="chart-card" style={{ marginTop: "2rem" }}>
+            <h3>Reach vs. Budget</h3>
+            <Line options={chartOptions} data={chartData} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
+</file>
+
+<file path="media-optimizer-ui/src/App.test.js">
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+test('renders learn react link', () => {
+  render(<App />);
+  const linkElement = screen.getByText(/learn react/i);
+  expect(linkElement).toBeInTheDocument();
+});
+</file>
+
+<file path="media-optimizer-ui/src/index.css">
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+</file>
+
+<file path="media-optimizer-ui/src/index.js">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+import reportWebVitals from './reportWebVitals';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
+</file>
+
+<file path="media-optimizer-ui/src/logo.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 841.9 595.3"><g fill="#61DAFB"><path d="M666.3 296.5c0-32.5-40.7-63.3-103.1-82.4 14.4-63.6 8-114.2-20.2-130.4-6.5-3.8-14.1-5.6-22.4-5.6v22.3c4.6 0 8.3.9 11.4 2.6 13.6 7.8 19.5 37.5 14.9 75.7-1.1 9.4-2.9 19.3-5.1 29.4-19.6-4.8-41-8.5-63.5-10.9-13.5-18.5-27.5-35.3-41.6-50 32.6-30.3 63.2-46.9 84-46.9V78c-27.5 0-63.5 19.6-99.9 53.6-36.4-33.8-72.4-53.2-99.9-53.2v22.3c20.7 0 51.4 16.5 84 46.6-14 14.7-28 31.4-41.3 49.9-22.6 2.4-44 6.1-63.6 11-2.3-10-4-19.7-5.2-29-4.7-38.2 1.1-67.9 14.6-75.8 3-1.8 6.9-2.6 11.5-2.6V78.5c-8.4 0-16 1.8-22.6 5.6-28.1 16.2-34.4 66.7-19.9 130.1-62.2 19.2-102.7 49.9-102.7 82.3 0 32.5 40.7 63.3 103.1 82.4-14.4 63.6-8 114.2 20.2 130.4 6.5 3.8 14.1 5.6 22.5 5.6 27.5 0 63.5-19.6 99.9-53.6 36.4 33.8 72.4 53.2 99.9 53.2 8.4 0 16-1.8 22.6-5.6 28.1-16.2 34.4-66.7 19.9-130.1 62-19.1 102.5-49.9 102.5-82.3zm-130.2-66.7c-3.7 12.9-8.3 26.2-13.5 39.5-4.1-8-8.4-16-13.1-24-4.6-8-9.5-15.8-14.4-23.4 14.2 2.1 27.9 4.7 41 7.9zm-45.8 106.5c-7.8 13.5-15.8 26.3-24.1 38.2-14.9 1.3-30 2-45.2 2-15.1 0-30.2-.7-45-1.9-8.3-11.9-16.4-24.6-24.2-38-7.6-13.1-14.5-26.4-20.8-39.8 6.2-13.4 13.2-26.8 20.7-39.9 7.8-13.5 15.8-26.3 24.1-38.2 14.9-1.3 30-2 45.2-2 15.1 0 30.2.7 45 1.9 8.3 11.9 16.4 24.6 24.2 38 7.6 13.1 14.5 26.4 20.8 39.8-6.3 13.4-13.2 26.8-20.7 39.9zm32.3-13c5.4 13.4 10 26.8 13.8 39.8-13.1 3.2-26.9 5.9-41.2 8 4.9-7.7 9.8-15.6 14.4-23.7 4.6-8 8.9-16.1 13-24.1zM421.2 430c-9.3-9.6-18.6-20.3-27.8-32 9 .4 18.2.7 27.5.7 9.4 0 18.7-.2 27.8-.7-9 11.7-18.3 22.4-27.5 32zm-74.4-58.9c-14.2-2.1-27.9-4.7-41-7.9 3.7-12.9 8.3-26.2 13.5-39.5 4.1 8 8.4 16 13.1 24 4.7 8 9.5 15.8 14.4 23.4zM420.7 163c9.3 9.6 18.6 20.3 27.8 32-9-.4-18.2-.7-27.5-.7-9.4 0-18.7.2-27.8.7 9-11.7 18.3-22.4 27.5-32zm-74 58.9c-4.9 7.7-9.8 15.6-14.4 23.7-4.6 8-8.9 16-13 24-5.4-13.4-10-26.8-13.8-39.8 13.1-3.1 26.9-5.8 41.2-7.9zm-90.5 125.2c-35.4-15.1-58.3-34.9-58.3-50.6 0-15.7 22.9-35.6 58.3-50.6 8.6-3.7 18-7 27.7-10.1 5.7 19.6 13.2 40 22.5 60.9-9.2 20.8-16.6 41.1-22.2 60.6-9.9-3.1-19.3-6.5-28-10.2zM310 490c-13.6-7.8-19.5-37.5-14.9-75.7 1.1-9.4 2.9-19.3 5.1-29.4 19.6 4.8 41 8.5 63.5 10.9 13.5 18.5 27.5 35.3 41.6 50-32.6 30.3-63.2 46.9-84 46.9-4.5-.1-8.3-1-11.3-2.7zm237.2-76.2c4.7 38.2-1.1 67.9-14.6 75.8-3 1.8-6.9 2.6-11.5 2.6-20.7 0-51.4-16.5-84-46.6 14-14.7 28-31.4 41.3-49.9 22.6-2.4 44-6.1 63.6-11 2.3 10.1 4.1 19.8 5.2 29.1zm38.5-66.7c-8.6 3.7-18 7-27.7 10.1-5.7-19.6-13.2-40-22.5-60.9 9.2-20.8 16.6-41.1 22.2-60.6 9.9 3.1 19.3 6.5 28.1 10.2 35.4 15.1 58.3 34.9 58.3 50.6-.1 15.7-23 35.6-58.4 50.6zM320.8 78.4z"/><circle cx="420.9" cy="296.5" r="45.7"/><path d="M520.5 78.1z"/></g></svg>
+</file>
+
+<file path="media-optimizer-ui/src/reportWebVitals.js">
+const reportWebVitals = onPerfEntry => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      getCLS(onPerfEntry);
+      getFID(onPerfEntry);
+      getFCP(onPerfEntry);
+      getLCP(onPerfEntry);
+      getTTFB(onPerfEntry);
+    });
+  }
+};
+
+export default reportWebVitals;
+</file>
+
+<file path="media-optimizer-ui/src/setupTests.js">
+// jest-dom adds custom jest matchers for asserting on DOM nodes.
+// allows you to do things like:
+// expect(element).toHaveTextContent(/react/i)
+// learn more: https://github.com/testing-library/jest-dom
+import '@testing-library/jest-dom';
+</file>
+
+<file path="media-optimizer-ui/.gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+</file>
+
+<file path="media-optimizer-ui/package.json">
+{
+  "name": "media-optimizer-ui",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.9.0",
+    "chart.js": "^4.4.9",
+    "react": "^19.1.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^19.1.0",
+    "react-scripts": "5.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+</file>
+
+<file path="media-optimizer-ui/README.md">
+# Getting Started with Create React App
+
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm start`
+
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
+
+### `npm test`
+
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `npm run build`
+
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
+
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+
+### `npm run eject`
+
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+
+## Learn More
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+To learn React, check out the [React documentation](https://reactjs.org/).
+
+### Code Splitting
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+
+### Analyzing the Bundle Size
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+
+### Making a Progressive Web App
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+
+### Advanced Configuration
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+
+### Deployment
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+
+### `npm run build` fails to minify
+
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+</file>
+
+<file path="optimizer-backend/app.py">
+# app.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import pandas as pd
+import uuid
+import threading
+from optimizer import clean_data, run_gurobi_optimizer
+
+app = Flask(__name__)
+# CORS allows the React app (on a different port) to call this backend
+CORS(app)
+
+jobs = {}
+
+def run_optimization_jobs(job_id, file_content, total_audience, max_budget):
+    """
+    This function runs in a background thread.
+    It computes the reach curve points incrementally and uses the last point as the main result.
+    """
+    try:
+        # --- 1. Data Prep ---
+        jobs[job_id]['status'] = 'Preparing data...'
+        xls = pd.ExcelFile(file_content)
+        sheet_name = next((name for name in xls.sheet_names if 'raleigh' in name.lower() and '7' in name), None)
+        if not sheet_name:
+            jobs[job_id]['status'] = 'Error'
+            jobs[job_id]['error'] = "Could not find a sheet named like 'Raleigh 7 day'"
+            return
+
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+        stations_df, pair_df = clean_data(df)
+
+        # --- 2. Incrementally Generate Reach Curve and Final Result ---
+        jobs[job_id]['status'] = 'Generating reach curve...'
+        num_points = 10
+
+        for i in range(1, num_points + 1):
+            current_budget = (max_budget / num_points) * i
+
+            # For the final point, we can allow a slightly longer time limit for better accuracy.
+            time_limit = 60 if i == num_points else 30
+
+            result = run_gurobi_optimizer(stations_df, pair_df, total_audience, current_budget, time_limit=time_limit)
+
+            if "error" in result:
+                # If one point fails, we can note it and continue or stop. Let's continue.
+                print(f"Warning: Could not solve for budget {current_budget}. Error: {result['error']}")
+                continue
+
+            # This is the "streaming" part. Append the result as soon as it's ready.
+            # The next poll from the frontend will pick up this new point.
+            jobs[job_id]['reach_curve'].append({
+                "budget": result["total_cost"],
+                "reach": result["net_reach_percentage"]
+            })
+            jobs[job_id]['reach_curve'].sort(key=lambda p: p['budget'])
+
+            # Update progress for the UI
+            jobs[job_id]['progress'] = i / num_points
+
+            # *** KEY CHANGE ***
+            # If this is the last point (i.e., for the max budget), use its full data
+            # as the main result for the summary cards.
+            if i == num_points:
+                jobs[job_id]['main_result'] = result
+
+        jobs[job_id]['status'] = 'Completed'
+
+    except Exception as e:
+        print(f"Error in job {job_id}: {e}")
+        jobs[job_id]['status'] = 'Error'
+        jobs[job_id]['error'] = f"An unexpected error occurred: {str(e)}"
+
+
+@app.route('/start-optimization', methods=['POST'])
+def start_job():
+    # --- Get Inputs ---
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    # ... (similar input validation as before) ...
+    try:
+        total_audience = int(request.form.get('totalAudience'))
+        budget = float(request.form.get('budget'))
+        file = request.files['file']
+        file_content = file.read() # Read file content into memory
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid Total Audience or Budget"}), 400
+
+    # --- Create and Start Job ---
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {
+        'status': 'Pending',
+        'main_result': None,
+        'reach_curve': [],
+        'progress': 0,
+        'error': None
+    }
+
+    # Run the long process in a background thread
+    thread = threading.Thread(
+        target=run_optimization_jobs,
+        args=(job_id, file_content, total_audience, budget)
+    )
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+@app.route('/job-status/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    return jsonify(job)
+
+
+
+if __name__ == '__main__':
+    # Run the app on port 5001 to avoid conflicts with React's default port 3000
+    app.run(debug=True, port=5001)
+</file>
+
+<file path="optimizer-backend/optimizer.py">
+# optimizer.py
+import pandas as pd
+import numpy as np
+import gurobipy as gp
+from gurobipy import GRB
+
+def clean_data(df):
+    """Cleans the raw dataframe from the XLSX file."""
+    # Select and rename core columns for station 1
+    df1 = df[['AQH1_Concatenate', 'AQH1_Cost-P18+', 'Cume1']].copy()
+    df1.rename(columns={
+        'AQH1_Concatenate': 'Station',
+        'AQH1_Cost-P18+': 'Cost',
+        'Cume1': 'Cume'
+    }, inplace=True)
+
+    # Select and rename core columns for station 2
+    df2 = df[['AQH2_Concatenate', 'AQH2_Cost-P18+', 'Cume2']].copy()
+    df2.rename(columns={
+        'AQH2_Concatenate': 'Station',
+        'AQH2_Cost-P18+': 'Cost',
+        'Cume2': 'Cume'
+    }, inplace=True)
+
+    # Combine and get unique stations
+    unique_stations_df = pd.concat([df1, df2]).drop_duplicates(subset='Station').reset_index(drop=True)
+
+    # Clean numeric columns
+    for col in ['Cost', 'Cume']:
+        unique_stations_df[col] = pd.to_numeric(unique_stations_df[col].astype(str).str.replace('[$,]', '', regex=True), errors='coerce')
+
+    unique_stations_df.dropna(inplace=True)
+    unique_stations_df = unique_stations_df[unique_stations_df['Cost'] > 0] # Exclude free spots
+
+    # Create a mapping for station pairs and their combined cume
+    pair_df = df[['AQH1_Concatenate', 'AQH2_Concatenate', 'Combined Cume']].copy()
+    pair_df.rename(columns={
+        'AQH1_Concatenate': 'Station1',
+        'AQH2_Concatenate': 'Station2'
+    }, inplace=True)
+    pair_df['Combined Cume'] = pd.to_numeric(pair_df['Combined Cume'].astype(str).str.replace(',', '', regex=True), errors='coerce')
+
+    return unique_stations_df, pair_df
+
+def run_greedy_optimizer(stations_df, budget):
+    """
+    A simple greedy optimizer that selects stations based on the best Cume-to-Cost ratio.
+    This is the initial simple version requested.
+    """
+    plan = []
+    current_cost = 0
+
+    # Calculate efficiency (Cume per dollar)
+    df = stations_df.copy()
+    df['efficiency'] = df['Cume'] / df['Cost']
+    df = df.sort_values(by='efficiency', ascending=False)
+
+    for _, station in df.iterrows():
+        if current_cost + station['Cost'] <= budget:
+            plan.append(station.to_dict())
+            current_cost += station['Cost']
+
+    # Calculate total cume (this is a simple sum, ignores duplication)
+    total_cume = sum(s['Cume'] for s in plan)
+
+    return {
+        "plan": plan,
+        "total_cost": current_cost,
+        "total_cume_gross": total_cume,
+        "note": "Greedy result is a simple sum of Cume, not deduplicated reach."
+    }
+
+def run_gurobi_optimizer(stations_df, pair_df, total_audience, budget,time_limit=60):
+    """
+    Runs the full quadratic optimizer to maximize deduplicated reach.
+    """
+    if total_audience <= 0:
+        raise ValueError("Total audience must be greater than 0.")
+
+    stations = stations_df['Station'].tolist()
+    costs = stations_df.set_index('Station')['Cost'].to_dict()
+    cumes = stations_df.set_index('Station')['Cume'].to_dict()
+
+    # --- Pre-computation for the Gurobi model ---
+    # r_i: Individual reach probability for each station
+    # d_ij: Duplication probability between station i and j
+
+    r_i = {s: cumes[s] / total_audience for s in stations}
+
+    duplication = {}
+    for _, row in pair_df.iterrows():
+        s1, s2 = row['Station1'], row['Station2']
+        if s1 in stations and s2 in stations:
+            # Ensure consistent key order (s1, s2)
+            if s1 > s2:
+                s1, s2 = s2, s1
+
+            # Combined reach R_ij = r_i + r_j - d_ij
+            # Therefore, d_ij = r_i + r_j - R_ij
+            combined_cume = row['Combined Cume']
+            combined_reach_prob = combined_cume / total_audience
+            d_ij = r_i[row['Station1']] + r_i[row['Station2']] - combined_reach_prob
+
+            # We only care about positive duplication
+            if d_ij > 0:
+                duplication[(s1, s2)] = d_ij
+
+    # --- Gurobi Model ---
+    model = gp.Model("MediaPlanOptimizer")
+
+    # 1. Decision Variables: x_i = 1 if we buy station i, 0 otherwise
+    x = model.addVars(stations, vtype=GRB.BINARY, name="x")
+
+    # 2. Objective Function: Maximize Net Reach
+    # Net Reach ≈ Σ r_i * x_i - Σ d_ij * x_i * x_j
+    linear_part = gp.quicksum(r_i[s] * x[s] for s in stations)
+    quadratic_part = gp.quicksum(duplication[pair] * x[pair[0]] * x[pair[1]] for pair in duplication)
+
+    model.setObjective(linear_part - quadratic_part, GRB.MAXIMIZE)
+
+    # 3. Constraints
+    # Budget constraint: Σ cost_i * x_i <= budget
+    model.addConstr(gp.quicksum(costs[s] * x[s] for s in stations) <= budget, "Budget")
+
+    # 4. Optimize
+    model.setParam('OutputFlag', 0) # Suppress Gurobi console output
+    model.optimize()
+
+    # --- Extract Results ---
+    if model.status == GRB.OPTIMAL or model.status == GRB.SUBOPTIMAL:
+        selected_stations_list = [s for s in stations if x[s].X > 0.5]
+
+        plan = stations_df[stations_df['Station'].isin(selected_stations_list)].to_dict('records')
+        total_cost = sum(s['Cost'] for s in plan)
+
+        # Calculate final net reach and other metrics
+        net_reach_prob = model.ObjVal
+        net_reach_people = net_reach_prob * total_audience
+        total_gross_cume = sum(s['Cume'] for s in plan)
+
+        # Gross Rating Points (GRPs)
+        grps = (total_gross_cume / total_audience) * 100 if total_audience > 0 else 0
+
+        # Average Frequency = Total Exposures / Net Reach People
+        # (Total Gross Cume is our proxy for total exposures)
+        avg_frequency = total_gross_cume / net_reach_people if net_reach_people > 0 else 0
+
+        return {
+            "plan": plan,
+            "total_cost": total_cost,
+            "net_reach_percentage": net_reach_prob * 100,
+            "net_reach_people": net_reach_people,
+            "total_gross_cume": total_gross_cume,
+            "grps": grps,
+            "avg_frequency": avg_frequency,
+        }
+    else:
+        return {"error": "Optimizer could not find an optimal solution."}
+</file>
+
+</files>
