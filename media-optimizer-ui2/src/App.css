@@ -1,0 +1,155 @@
+/* src/App.css */
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    margin: 0;
+    padding: 2rem;
+}
+
+.App {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+h1,
+h2 {
+    color: #0b2d48;
+    border-bottom: 2px solid #74a4bc;
+    padding-bottom: 0.5rem;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background-color: #eaf4f4;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.control-item label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #0b2d48;
+}
+
+.control-item input[type="number"],
+.control-item input[type="file"] {
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.optimize-button {
+    grid-column: 1 / -1;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+    background-color: #1d6a96;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.optimize-button:hover {
+    background-color: #165375;
+}
+
+.optimize-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.summary-card,
+.plan-card,
+.chart-card {
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.chart-card {
+    grid-column: 1 / -1; /* Make chart span both columns */
+}
+
+.summary-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.metric {
+    background: white;
+    padding: 1rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #666;
+    display: block;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1d6a96;
+}
+
+.plan-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.plan-table th,
+.plan-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.plan-table th {
+    background-color: #eaf4f4;
+}
+
+.error-message {
+    color: #d9534f;
+    background: #f2dede;
+    padding: 1rem;
+    border: 1px solid #ebccd1;
+    border-radius: 4px;
+    margin-top: 1rem;
+}
+
+.loading-message {
+    text-align: center;
+    font-size: 1.2rem;
+    padding: 2rem;
+    color: #666;
+}
